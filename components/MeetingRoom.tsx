@@ -212,9 +212,7 @@ const MeetingRoom = () => {
           </button>
 
           {/* Raise Hand Button */}
-          <div className="hidden sm:block">
-            <RaiseHandButton />
-          </div>
+          <RaiseHandButton />
 
           {/* Call Stats - Hidden on mobile */}
           <div className="hidden md:block">

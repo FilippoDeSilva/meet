@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Hand } from 'lucide-react';
+import { Hand, ChevronUp } from 'lucide-react';
+import { useRaiseHand } from '@/contexts/RaiseHandContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,49 +10,20 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 
-interface RaisedHand {
-  userId: string;
-  userName: string;
-  timestamp: number;
-}
-
 const RaiseHandButton = () => {
-  const [raisedHands, setRaisedHands] = useState<RaisedHand[]>([]);
-  const [isHandRaised, setIsHandRaised] = useState(false);
-
-  const handleRaiseHand = () => {
-    if (!isHandRaised) {
-      const newHand: RaisedHand = {
-        userId: `user-${Date.now()}`,
-        userName: 'You',
-        timestamp: Date.now(),
-      };
-      setRaisedHands([...raisedHands, newHand]);
-      setIsHandRaised(true);
-    } else {
-      setRaisedHands(raisedHands.filter((hand) => hand.userName !== 'You'));
-      setIsHandRaised(false);
-    }
-  };
-
-  const handleLowerHand = (userId: string) => {
-    setRaisedHands(raisedHands.filter((hand) => hand.userId !== userId));
-    if (userId.includes('user-')) {
-      setIsHandRaised(false);
-    }
-  };
+  const { raisedHands, isHandRaised, raiseHand, lowerHand, lowerHandForUser, currentUserPosition } = useRaiseHand();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          onClick={handleRaiseHand}
-          className={`p-2 rounded-full transition-all duration-200 ${
+          onClick={isHandRaised ? lowerHand : raiseHand}
+          className={`p-2 rounded-full transition-all duration-200 relative ${
             isHandRaised
               ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
               : 'hover:bg-gray-700 text-white'
           }`}
-          title="Raise hand"
+          title={isHandRaised ? 'Lower hand' : 'Raise hand'}
         >
           <div className="flex items-center gap-2">
             <Hand size={20} />
@@ -61,24 +32,31 @@ const RaiseHandButton = () => {
                 {raisedHands.length}
               </span>
             )}
+            {isHandRaised && currentUserPosition && (
+              <span className="text-xs font-bold bg-yellow-500 text-gray-900 rounded-full w-5 h-5 flex items-center justify-center">
+                {currentUserPosition}
+              </span>
+            )}
           </div>
         </button>
       </DropdownMenuTrigger>
 
       {raisedHands.length > 0 && (
-        <DropdownMenuContent className="bg-gray-800 border-gray-700 text-white w-64">
+        <DropdownMenuContent className="bg-gray-800 border-gray-700 text-white w-72">
           <div className="px-3 py-2 text-xs font-semibold text-gray-400">
-            QUESTIONS ({raisedHands.length})
+            RAISED HANDS ({raisedHands.length})
           </div>
           <DropdownMenuSeparator className="bg-gray-700" />
           {raisedHands.map((hand, index) => (
             <div key={hand.userId}>
               <DropdownMenuItem
-                onClick={() => handleLowerHand(hand.userId)}
-                className="flex items-center justify-between cursor-pointer hover:bg-gray-700"
+                onClick={() => lowerHandForUser(hand.userId)}
+                className="flex items-center justify-between cursor-pointer hover:bg-gray-700 px-3 py-2"
               >
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500 text-gray-900 text-xs font-bold">
+                    {hand.position}
+                  </div>
                   <span className="text-sm">{hand.userName}</span>
                 </div>
                 <span className="text-xs text-gray-400">Lower</span>

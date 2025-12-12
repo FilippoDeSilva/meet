@@ -10,6 +10,7 @@ import { useGetCallById } from '@/hooks/useGetCallById';
 import Alert from '@/components/Alert';
 import MeetingSetup from '@/components/MeetingSetup';
 import MeetingRoom from '@/components/MeetingRoom';
+import { RaiseHandProvider } from '@/contexts/RaiseHandContext';
 
 const MeetingPage = () => {
   const { id } = useParams();
@@ -34,12 +35,13 @@ const MeetingPage = () => {
     <main className="h-screen w-full">
       <StreamCall call={call}>
         <StreamTheme>
-
-        {!isSetupComplete ? (
-          <MeetingSetup setIsSetupComplete={setIsSetupComplete} />
-        ) : (
-          <MeetingRoom />
-        )}
+          <RaiseHandProvider>
+            {!isSetupComplete ? (
+              <MeetingSetup setIsSetupComplete={setIsSetupComplete} />
+            ) : (
+              <MeetingRoom />
+            )}
+          </RaiseHandProvider>
         </StreamTheme>
       </StreamCall>
     </main>
