@@ -1,6 +1,6 @@
 'use client';
 
-import { Hand, ChevronUp } from 'lucide-react';
+import { Hand } from 'lucide-react';
 import { useRaiseHand } from '@/contexts/RaiseHandContext';
 import {
   DropdownMenu,
