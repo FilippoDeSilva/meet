@@ -1,13 +1,18 @@
-import CallList from '@/components/CallList';
+import StreamRecordingsList from '@/components/StreamRecordingsList';
 
-const PreviousPage = () => {
+const RecordingsPage = () => {
   return (
-    <section className="flex size-full flex-col gap-10 text-white">
-      <h1 className="text-3xl font-bold">Recordings</h1>
+    <section className="flex size-full flex-col gap-6 text-white">
+      <div className="space-y-2">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+          Recordings
+        </h1>
+        <p className="text-gray-400">Manage and view all your meeting recordings</p>
+      </div>
 
-      <CallList type="recordings" />
+      <StreamRecordingsList />
     </section>
   );
 };
 
-export default PreviousPage;
+export default RecordingsPage;
