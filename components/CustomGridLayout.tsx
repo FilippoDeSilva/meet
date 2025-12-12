@@ -17,9 +17,12 @@ const CustomGridLayout: React.FC = () => {
 
       participants.forEach((participant) => {
         const participantName = participant.name || participant.userId;
-        const raisedHand = raisedHands.find(
-          (hand) => hand.userId === participant.userId || hand.userName === participantName
-        );
+        
+        // Check if participant has a raised-hand reaction
+        const hasRaisedHand = participant.reaction?.type === 'raised-hand';
+        const raisedHand = hasRaisedHand
+          ? raisedHands.find((hand) => hand.userId === participant.userId)
+          : null;
 
         let containerFound: HTMLElement | null = null;
 
@@ -64,7 +67,7 @@ const CustomGridLayout: React.FC = () => {
         if (containerFound) {
           let badge = containerFound.querySelector('[data-raised-hand-badge]') as HTMLElement;
 
-          if (raisedHand) {
+          if (raisedHand && hasRaisedHand) {
             if (!badge) {
               badge = document.createElement('div');
               badge.setAttribute('data-raised-hand-badge', 'true');
