@@ -23,12 +23,9 @@ const CustomSpeakerLayout: React.FC<CustomSpeakerLayoutProps> = ({
 
       participants.forEach((participant) => {
         const participantName = participant.name || participant.userId;
-        
-        // Check if participant has a raised-hand reaction
-        const hasRaisedHand = participant.reaction?.type === 'raised-hand';
-        const raisedHand = hasRaisedHand 
-          ? raisedHands.find((hand) => hand.userId === participant.userId)
-          : null;
+        const raisedHand = raisedHands.find(
+          (hand) => hand.userId === participant.userId || hand.userName === participantName
+        );
 
         let containerFound: HTMLElement | null = null;
 

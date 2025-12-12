@@ -120,28 +120,47 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const currentUserPosition = raisedHands.find((hand) => hand.userId === getCurrentUserId())?.position ?? null;
 
   useEffect(() => {
-    const updateRaisedHandsFromParticipants = () => {
-      const hands: RaisedHand[] = [];
+    if (!call) return;
 
-      participants.forEach((participant) => {
-        if (participant.reaction?.type === 'raised-hand') {
-          const hand: RaisedHand = {
-            userId: participant.userId,
-            userName: participant.name || participant.userId,
-            timestamp: participant.reaction.custom?.timestamp || Date.now(),
+    const handleCustomEvent = (event: any) => {
+      if (event.type !== 'raise_hand_event') return;
+
+      const { action, userId, userName, timestamp } = event;
+
+      if (action === 'raise') {
+        setRaisedHands((prev) => {
+          const exists = prev.some((hand) => hand.userId === userId);
+          if (exists) return prev;
+
+          const newHand: RaisedHand = {
+            userId,
+            userName,
+            timestamp,
             position: 0,
           };
-          hands.push(hand);
-        }
-      });
 
-      if (hands.length > 0 || raisedHands.length > 0) {
-        updateRaisedHandsWithPosition(hands);
+          const updated = [...prev, newHand];
+          updateRaisedHandsWithPosition(updated);
+          return updated;
+        });
+      } else if (action === 'lower') {
+        setRaisedHands((prev) => {
+          const updated = prev.filter((hand) => hand.userId !== userId);
+          updateRaisedHandsWithPosition(updated);
+          return updated;
+        });
       }
     };
 
-    updateRaisedHandsFromParticipants();
-  }, [participants, updateRaisedHandsWithPosition, raisedHands.length]);
+    eventListenerRef.current = handleCustomEvent;
+    call.on('custom_event' as any, handleCustomEvent);
+
+    return () => {
+      if (eventListenerRef.current) {
+        call.off('custom_event' as any, eventListenerRef.current);
+      }
+    };
+  }, [call, updateRaisedHandsWithPosition]);
 
   return (
     <RaiseHandContext.Provider
