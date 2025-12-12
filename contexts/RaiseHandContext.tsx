@@ -28,7 +28,8 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const { useLocalParticipant, useParticipants } = useCallStateHooks();
   const localParticipant = useLocalParticipant();
   const participants = useParticipants();
-  const eventListenerRef = useRef<((event: any) => void) | null>(null);
+  const raiseHandTimestampsRef = useRef<Map<string, number>>(new Map());
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const getCurrentUserId = useCallback(() => {
     return localParticipant?.userId || `user-${Date.now()}`;
@@ -38,115 +39,127 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return localParticipant?.name || 'You';
   }, [localParticipant?.name]);
 
-  const broadcastRaiseHand = useCallback(
-    async (action: 'raise' | 'lower') => {
-      if (!call) return;
+  const raiseHand = useCallback(async () => {
+    if (!call || isHandRaised) return;
 
-      try {
-        const eventData = {
-          type: 'raise_hand_event',
-          action,
-          userId: getCurrentUserId(),
+    try {
+      const timestamp = Date.now();
+      const userId = getCurrentUserId();
+      raiseHandTimestampsRef.current.set(userId, timestamp);
+      
+      await call.sendReaction({
+        type: 'raised-hand',
+        emoji_code: ':raised_hand:',
+        custom: {
+          timestamp,
           userName: getCurrentUserName(),
-          timestamp: Date.now(),
-        };
+        },
+      });
+      
+      setIsHandRaised(true);
 
-        await call.sendCustomEvent(eventData);
-      } catch (error) {
-        console.error('Failed to broadcast raise hand event:', error);
+      // Start refresh interval to keep reaction alive (refresh every 3 seconds)
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+      
+      refreshIntervalRef.current = setInterval(async () => {
+        try {
+          await call.sendReaction({
+            type: 'raised-hand',
+            emoji_code: ':raised_hand:',
+            custom: {
+              timestamp,
+              userName: getCurrentUserName(),
+            },
+          });
+        } catch (error) {
+          console.error('Failed to refresh raise hand reaction:', error);
+        }
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to raise hand:', error);
+    }
+  }, [call, isHandRaised, getCurrentUserId, getCurrentUserName]);
+
+  const lowerHand = useCallback(async () => {
+    if (!call) return;
+
+    try {
+      const userId = getCurrentUserId();
+      raiseHandTimestampsRef.current.delete(userId);
+      
+      // Clear the refresh interval
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+      
+      await call.sendReaction({
+        type: 'raised-hand',
+        emoji_code: ':raised_hand:',
+        custom: {
+          clearAfterTimeout: true,
+        },
+      });
+      
+      setIsHandRaised(false);
+    } catch (error) {
+      console.error('Failed to lower hand:', error);
+    }
+  }, [call, getCurrentUserId]);
+
+  const lowerHandForUser = useCallback(
+    async (userId: string) => {
+      if (userId === getCurrentUserId()) {
+        await lowerHand();
       }
     },
-    [call, getCurrentUserId, getCurrentUserName]
+    [getCurrentUserId, lowerHand]
   );
 
-  const updateRaisedHandsWithPosition = useCallback((hands: RaisedHand[]) => {
+  const currentUserPosition = raisedHands.find((hand) => hand.userId === getCurrentUserId())?.position ?? null;
+
+  // Update raised hands from participants' reactions
+  useEffect(() => {
+    const hands: RaisedHand[] = [];
+
+    participants.forEach((participant) => {
+      if (participant.reaction?.type === 'raised-hand') {
+        const timestamp = participant.reaction.custom?.timestamp || Date.now();
+        hands.push({
+          userId: participant.userId,
+          userName: participant.name || participant.userId,
+          timestamp,
+          position: 0,
+        });
+      }
+    });
+
+    // Sort by timestamp and assign positions
     const sortedHands = hands.sort((a, b) => a.timestamp - b.timestamp);
     const handsWithPosition = sortedHands.map((hand, index) => ({
       ...hand,
       position: index + 1,
     }));
+
     setRaisedHands(handsWithPosition);
-  }, []);
 
-  const raiseHand = useCallback(async () => {
-    if (isHandRaised) return;
+    // Update isHandRaised based on current user's reaction
+    const currentUserHasRaisedHand = handsWithPosition.some(
+      (hand) => hand.userId === getCurrentUserId()
+    );
+    setIsHandRaised(currentUserHasRaisedHand);
+  }, [participants, getCurrentUserId]);
 
-    setIsHandRaised(true);
-    await broadcastRaiseHand('raise');
-  }, [isHandRaised, broadcastRaiseHand]);
-
-  const lowerHand = useCallback(async () => {
-    setIsHandRaised(false);
-    await broadcastRaiseHand('lower');
-  }, [broadcastRaiseHand]);
-
-  const lowerHandForUser = useCallback(
-    async (userId: string) => {
-      if (userId === getCurrentUserId()) {
-        setIsHandRaised(false);
-      }
-
-      setRaisedHands((prev) => {
-        const updated = prev.filter((hand) => hand.userId !== userId);
-        updateRaisedHandsWithPosition(updated);
-        return updated;
-      });
-    },
-    [getCurrentUserId, updateRaisedHandsWithPosition]
-  );
-
-  const currentUserPosition = raisedHands.find((hand) => hand.userId === getCurrentUserId())?.position ?? null;
-
+  // Cleanup interval on unmount
   useEffect(() => {
-    if (!call) return;
-
-    const handleCustomEvent = (event: any) => {
-      if (event.type !== 'raise_hand_event') return;
-
-      const { action, userId, userName, timestamp } = event;
-
-      if (action === 'raise') {
-        setRaisedHands((prev) => {
-          const exists = prev.some((hand) => hand.userId === userId);
-          if (exists) return prev;
-
-          const newHand: RaisedHand = {
-            userId,
-            userName,
-            timestamp,
-            position: 0,
-          };
-
-          const updated = [...prev, newHand];
-          const sortedHands = updated.sort((a, b) => a.timestamp - b.timestamp);
-          const handsWithPosition = sortedHands.map((hand, index) => ({
-            ...hand,
-            position: index + 1,
-          }));
-          return handsWithPosition;
-        });
-      } else if (action === 'lower') {
-        setRaisedHands((prev) => {
-          const updated = prev.filter((hand) => hand.userId !== userId);
-          const sortedHands = updated.sort((a, b) => a.timestamp - b.timestamp);
-          const handsWithPosition = sortedHands.map((hand, index) => ({
-            ...hand,
-            position: index + 1,
-          }));
-          return handsWithPosition;
-        });
-      }
-    };
-
-    eventListenerRef.current = handleCustomEvent;
-    call.on('custom_event' as any, handleCustomEvent);
-
     return () => {
-      if (eventListenerRef.current) {
-        call.off('custom_event' as any, eventListenerRef.current);
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
       }
     };
-  }, [call]);
+  }, []);
 
   return (
     <RaiseHandContext.Provider
