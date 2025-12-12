@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useStreamVideoClient } from '@stream-io/video-react-sdk';
 
 export interface StreamRecording {
@@ -8,17 +8,60 @@ export interface StreamRecording {
   end_time?: string;
 }
 
-const MAX_RETRIES = 2;
-const INITIAL_RETRY_DELAY = 2000;
-const REQUEST_DELAY = 500;
-// const MAX_CONCURRENT_REQUESTS = 2;
+const MAX_RETRIES = 1;
+const INITIAL_RETRY_DELAY = 1000;
+const MAX_CONCURRENT_REQUESTS = 5;
+const FETCH_TIMEOUT = 4000;
 
 // Exponential backoff with jitter
 const getBackoffDelay = (attempt: number): number => {
   const baseDelay = INITIAL_RETRY_DELAY * Math.pow(2, attempt);
-  const jitter = Math.random() * 1000;
+  const jitter = Math.random() * 500;
   return baseDelay + jitter;
 };
+
+// Concurrent request queue
+class RequestQueue {
+  private running = 0;
+  private queue: Array<() => Promise<any>> = [];
+  private maxConcurrent: number;
+
+  constructor(maxConcurrent: number) {
+    this.maxConcurrent = maxConcurrent;
+  }
+
+  async add<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await fn();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      this.process();
+    });
+  }
+
+  private async process() {
+    if (this.running >= this.maxConcurrent || this.queue.length === 0) {
+      return;
+    }
+
+    this.running++;
+    const fn = this.queue.shift();
+    
+    if (fn) {
+      try {
+        await fn();
+      } finally {
+        this.running--;
+        this.process();
+      }
+    }
+  }
+}
 
 export const useStreamRecordings = () => {
   const client = useStreamVideoClient();
@@ -41,52 +84,60 @@ export const useStreamRecordings = () => {
         });
 
         const allRecordings: StreamRecording[] = [];
+        const queue = new RequestQueue(MAX_CONCURRENT_REQUESTS);
 
-        // Process calls sequentially with throttling to avoid rate limiting
-        for (let i = 0; i < calls.length; i++) {
-          const call = calls[i];
-          
-          // Add delay between requests to avoid rate limiting
-          if (i > 0) {
-            await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY));
-          }
+        // Process calls with concurrent requests to avoid timeout
+        const recordingPromises = calls.map(call =>
+          queue.add(async () => {
+            try {
+              let recordingsResponse = null;
+              let callRetries = 0;
 
-          try {
-            let recordingsResponse = null;
-            let callRetries = 0;
-
-            // Retry fetching recordings for this specific call with exponential backoff
-            while (callRetries < MAX_RETRIES) {
-              try {
-                recordingsResponse = await call.queryRecordings();
-                if (recordingsResponse?.recordings && recordingsResponse.recordings.length > 0) {
-                  allRecordings.push(...recordingsResponse.recordings);
-                  break;
-                } else {
-                  // No recordings for this call, move to next
-                  break;
-                }
-              } catch (err: any) {
-                callRetries++;
-                
-                // Check if it's a rate limit error
-                const isRateLimitError = err?.status === 429 || err?.message?.includes('429');
-                
-                if (callRetries < MAX_RETRIES) {
-                  const delay = isRateLimitError 
-                    ? getBackoffDelay(callRetries) 
-                    : INITIAL_RETRY_DELAY;
-                  console.warn(`Retrying recordings for call ${call.id} (attempt ${callRetries + 1}/${MAX_RETRIES}) after ${delay}ms`);
-                  await new Promise(resolve => setTimeout(resolve, delay));
-                } else {
-                  console.warn(`Failed to fetch recordings for call ${call.id} after ${MAX_RETRIES} retries`);
+              // Retry fetching recordings for this specific call with exponential backoff
+              while (callRetries < MAX_RETRIES) {
+                try {
+                  recordingsResponse = await call.queryRecordings();
+                  if (recordingsResponse?.recordings && recordingsResponse.recordings.length > 0) {
+                    return recordingsResponse.recordings;
+                  } else {
+                    return [];
+                  }
+                } catch (err: any) {
+                  callRetries++;
+                  
+                  // Check if it's a rate limit error
+                  const isRateLimitError = err?.status === 429 || err?.message?.includes('429');
+                  
+                  if (callRetries < MAX_RETRIES) {
+                    const delay = isRateLimitError 
+                      ? getBackoffDelay(callRetries) 
+                      : INITIAL_RETRY_DELAY;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                  } else {
+                    console.warn(`Failed to fetch recordings for call ${call.id} after ${MAX_RETRIES} retries`);
+                    return [];
+                  }
                 }
               }
+              return [];
+            } catch (err) {
+              console.error(`Error processing call ${call.id}:`, err);
+              return [];
             }
-          } catch (err) {
-            console.error(`Error processing call ${call.id}:`, err);
-          }
-        }
+          })
+        );
+
+        // Wait for all requests with timeout
+        const results = await Promise.race([
+          Promise.all(recordingPromises),
+          new Promise<StreamRecording[][]>((_, reject) =>
+            setTimeout(() => reject(new Error('Recording fetch timeout')), FETCH_TIMEOUT)
+          ),
+        ]);
+
+        results.forEach(recordingArray => {
+          allRecordings.push(...recordingArray);
+        });
 
         return allRecordings;
       } catch (err) {
