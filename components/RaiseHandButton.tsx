@@ -13,11 +13,23 @@ import {
 const RaiseHandButton = () => {
   const { raisedHands, isHandRaised, raiseHand, lowerHand, lowerHandForUser, currentUserPosition } = useRaiseHand();
 
+  const handleToggleHand = async () => {
+    if (isHandRaised) {
+      await lowerHand();
+    } else {
+      await raiseHand();
+    }
+  };
+
+  const handleLowerHand = async (userId: string) => {
+    await lowerHandForUser(userId);
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          onClick={isHandRaised ? lowerHand : raiseHand}
+          onClick={handleToggleHand}
           className={`p-2 rounded-full transition-all duration-200 relative ${
             isHandRaised
               ? 'bg-yellow-600 hover:bg-yellow-700 text-white'

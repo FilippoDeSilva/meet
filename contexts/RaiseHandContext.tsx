@@ -13,9 +13,9 @@ export interface RaisedHand {
 interface RaiseHandContextType {
   raisedHands: RaisedHand[];
   isHandRaised: boolean;
-  raiseHand: () => void;
-  lowerHand: () => void;
-  lowerHandForUser: (userId: string) => void;
+  raiseHand: () => Promise<void>;
+  lowerHand: () => Promise<void>;
+  lowerHandForUser: (userId: string) => Promise<void>;
   currentUserPosition: number | null;
 }
 
@@ -25,8 +25,9 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [raisedHands, setRaisedHands] = useState<RaisedHand[]>([]);
   const [isHandRaised, setIsHandRaised] = useState(false);
   const call = useCall();
-  const { useLocalParticipant } = useCallStateHooks();
+  const { useLocalParticipant, useParticipants } = useCallStateHooks();
   const localParticipant = useLocalParticipant();
+  const participants = useParticipants();
   const eventListenerRef = useRef<((event: any) => void) | null>(null);
 
   const getCurrentUserId = useCallback(() => {
@@ -38,24 +39,33 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [localParticipant?.name]);
 
   const broadcastRaiseHand = useCallback(
-    (action: 'raise' | 'lower', userId: string, userName: string) => {
+    async (action: 'raise' | 'lower') => {
       if (!call) return;
 
       try {
-        const eventData = {
-          type: 'raise_hand',
-          action,
-          userId,
-          userName,
-          timestamp: Date.now(),
-        };
-
-        call.sendCustomEvent(eventData);
+        if (action === 'raise') {
+          await call.sendReaction({
+            type: 'raised-hand',
+            emoji_code: ':raised_hand:',
+            custom: {
+              timestamp: Date.now(),
+              userName: localParticipant?.name || 'You',
+            },
+          });
+        } else {
+          await call.sendReaction({
+            type: 'raised-hand',
+            emoji_code: ':raised_hand:',
+            custom: {
+              clearAfterTimeout: true,
+            },
+          });
+        }
       } catch (error) {
-        console.error('Failed to broadcast raise hand event:', error);
+        console.error('Failed to broadcast raise hand reaction:', error);
       }
     },
-    [call]
+    [call, localParticipant?.name]
   );
 
   const updateRaisedHandsWithPosition = useCallback((hands: RaisedHand[]) => {
@@ -67,77 +77,80 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setRaisedHands(handsWithPosition);
   }, []);
 
-  const raiseHand = useCallback(() => {
+  const raiseHand = useCallback(async () => {
     if (isHandRaised) return;
 
     const userId = getCurrentUserId();
     const userName = getCurrentUserName();
+    const timestamp = Date.now();
 
+    const newHand: RaisedHand = {
+      userId,
+      userName,
+      timestamp,
+      position: 0,
+    };
+
+    setRaisedHands((prev) => {
+      const updated = [...prev, newHand];
+      updateRaisedHandsWithPosition(updated);
+      return updated;
+    });
     setIsHandRaised(true);
-    broadcastRaiseHand('raise', userId, userName);
-  }, [isHandRaised, getCurrentUserId, getCurrentUserName, broadcastRaiseHand]);
+    await broadcastRaiseHand('raise');
+  }, [isHandRaised, getCurrentUserId, getCurrentUserName, broadcastRaiseHand, updateRaisedHandsWithPosition]);
 
-  const lowerHand = useCallback(() => {
+  const lowerHand = useCallback(async () => {
     const userId = getCurrentUserId();
+    setRaisedHands((prev) => {
+      const updated = prev.filter((hand) => hand.userId !== userId);
+      updateRaisedHandsWithPosition(updated);
+      return updated;
+    });
     setIsHandRaised(false);
-    broadcastRaiseHand('lower', userId, getCurrentUserName());
-  }, [getCurrentUserId, getCurrentUserName, broadcastRaiseHand]);
+    await broadcastRaiseHand('lower');
+  }, [getCurrentUserId, broadcastRaiseHand, updateRaisedHandsWithPosition]);
 
   const lowerHandForUser = useCallback(
-    (userId: string) => {
+    async (userId: string) => {
       if (userId === getCurrentUserId()) {
         setIsHandRaised(false);
       }
 
-      broadcastRaiseHand('lower', userId, '');
+      setRaisedHands((prev) => {
+        const updated = prev.filter((hand) => hand.userId !== userId);
+        updateRaisedHandsWithPosition(updated);
+        return updated;
+      });
     },
-    [getCurrentUserId, broadcastRaiseHand]
+    [getCurrentUserId, updateRaisedHandsWithPosition]
   );
 
   const currentUserPosition = raisedHands.find((hand) => hand.userId === getCurrentUserId())?.position ?? null;
 
   useEffect(() => {
-    if (!call) return;
+    const updateRaisedHandsFromParticipants = () => {
+      const hands: RaisedHand[] = [];
 
-    const handleCustomEvent = (event: any) => {
-      if (event.type !== 'raise_hand') return;
-
-      const { action, userId, userName, timestamp } = event;
-
-      if (action === 'raise') {
-        setRaisedHands((prev) => {
-          const exists = prev.some((hand) => hand.userId === userId);
-          if (exists) return prev;
-
-          const newHand: RaisedHand = {
-            userId,
-            userName,
-            timestamp,
+      participants.forEach((participant) => {
+        if (participant.reaction?.type === 'raised-hand') {
+          const hand: RaisedHand = {
+            userId: participant.userId,
+            userName: participant.name || participant.userId,
+            timestamp: participant.reaction.custom?.timestamp || Date.now(),
             position: 0,
           };
+          hands.push(hand);
+        }
+      });
 
-          const updated = [...prev, newHand];
-          updateRaisedHandsWithPosition(updated);
-          return updated;
-        });
-      } else if (action === 'lower') {
-        setRaisedHands((prev) => {
-          const updated = prev.filter((hand) => hand.userId !== userId);
-          updateRaisedHandsWithPosition(updated);
-          return updated;
-        });
+      if (hands.length > 0 || raisedHands.length > 0) {
+        updateRaisedHandsWithPosition(hands);
       }
     };
 
-    eventListenerRef.current = handleCustomEvent;
-    call.on('custom_event' as any, handleCustomEvent);
-
-    return () => {
-      if (eventListenerRef.current) {
-        call.off('custom_event' as any, eventListenerRef.current);
-      }
-    };
-  }, [call, updateRaisedHandsWithPosition]);
+    updateRaisedHandsFromParticipants();
+  }, [participants, updateRaisedHandsWithPosition, raisedHands.length]);
 
   return (
     <RaiseHandContext.Provider
