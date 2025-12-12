@@ -43,29 +43,20 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!call) return;
 
       try {
-        if (action === 'raise') {
-          await call.sendReaction({
-            type: 'raised-hand',
-            emoji_code: ':raised_hand:',
-            custom: {
-              timestamp: Date.now(),
-              userName: localParticipant?.name || 'You',
-            },
-          });
-        } else {
-          await call.sendReaction({
-            type: 'raised-hand',
-            emoji_code: ':raised_hand:',
-            custom: {
-              clearAfterTimeout: true,
-            },
-          });
-        }
+        const eventData = {
+          type: 'raise_hand_event',
+          action,
+          userId: getCurrentUserId(),
+          userName: getCurrentUserName(),
+          timestamp: Date.now(),
+        };
+
+        await call.sendCustomEvent(eventData);
       } catch (error) {
-        console.error('Failed to broadcast raise hand reaction:', error);
+        console.error('Failed to broadcast raise hand event:', error);
       }
     },
-    [call, localParticipant?.name]
+    [call, getCurrentUserId, getCurrentUserName]
   );
 
   const updateRaisedHandsWithPosition = useCallback((hands: RaisedHand[]) => {
