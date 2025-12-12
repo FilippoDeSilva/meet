@@ -21,10 +21,6 @@ const RaiseHandButton = () => {
     }
   };
 
-  const handleLowerHand = async (userId: string) => {
-    await lowerHandForUser(userId);
-  };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
