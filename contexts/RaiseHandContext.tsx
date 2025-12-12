@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useCall, useCallStateHooks } from '@stream-io/video-react-sdk';
 
 export interface RaisedHand {
@@ -27,6 +27,7 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const call = useCall();
   const { useLocalParticipant } = useCallStateHooks();
   const localParticipant = useLocalParticipant();
+  const eventListenerRef = useRef<((event: any) => void) | null>(null);
 
   const getCurrentUserId = useCallback(() => {
     return localParticipant?.userId || `user-${Date.now()}`;
@@ -57,38 +58,58 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [call]
   );
 
+  const updateRaisedHandsWithPosition = useCallback((hands: RaisedHand[]) => {
+    const sortedHands = hands.sort((a, b) => a.timestamp - b.timestamp);
+    const handsWithPosition = sortedHands.map((hand, index) => ({
+      ...hand,
+      position: index + 1,
+    }));
+    setRaisedHands(handsWithPosition);
+  }, []);
+
   const raiseHand = useCallback(() => {
     if (isHandRaised) return;
 
     const userId = getCurrentUserId();
     const userName = getCurrentUserName();
     const timestamp = Date.now();
-    const position = raisedHands.length + 1;
 
     const newHand: RaisedHand = {
       userId,
       userName,
       timestamp,
-      position,
+      position: 0,
     };
 
-    setRaisedHands((prev) => [...prev, newHand]);
+    setRaisedHands((prev) => {
+      const updated = [...prev, newHand];
+      updateRaisedHandsWithPosition(updated);
+      return updated;
+    });
     setIsHandRaised(true);
 
     broadcastRaiseHand('raise', userId, userName);
-  }, [isHandRaised, raisedHands.length, getCurrentUserId, getCurrentUserName, broadcastRaiseHand]);
+  }, [isHandRaised, getCurrentUserId, getCurrentUserName, broadcastRaiseHand, updateRaisedHandsWithPosition]);
 
   const lowerHand = useCallback(() => {
     const userId = getCurrentUserId();
-    setRaisedHands((prev) => prev.filter((hand) => hand.userId !== userId));
+    setRaisedHands((prev) => {
+      const updated = prev.filter((hand) => hand.userId !== userId);
+      updateRaisedHandsWithPosition(updated);
+      return updated;
+    });
     setIsHandRaised(false);
 
     broadcastRaiseHand('lower', userId, getCurrentUserName());
-  }, [getCurrentUserId, getCurrentUserName, broadcastRaiseHand]);
+  }, [getCurrentUserId, getCurrentUserName, broadcastRaiseHand, updateRaisedHandsWithPosition]);
 
   const lowerHandForUser = useCallback(
     (userId: string) => {
-      setRaisedHands((prev) => prev.filter((hand) => hand.userId !== userId));
+      setRaisedHands((prev) => {
+        const updated = prev.filter((hand) => hand.userId !== userId);
+        updateRaisedHandsWithPosition(updated);
+        return updated;
+      });
 
       if (userId === getCurrentUserId()) {
         setIsHandRaised(false);
@@ -96,7 +117,7 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       broadcastRaiseHand('lower', userId, '');
     },
-    [getCurrentUserId, broadcastRaiseHand]
+    [getCurrentUserId, broadcastRaiseHand, updateRaisedHandsWithPosition]
   );
 
   const currentUserPosition = raisedHands.find((hand) => hand.userId === getCurrentUserId())?.position ?? null;
@@ -114,28 +135,35 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const exists = prev.some((hand) => hand.userId === userId);
           if (exists) return prev;
 
-          const position = prev.length + 1;
-          return [
-            ...prev,
-            {
-              userId,
-              userName,
-              timestamp,
-              position,
-            },
-          ];
+          const newHand: RaisedHand = {
+            userId,
+            userName,
+            timestamp,
+            position: 0,
+          };
+
+          const updated = [...prev, newHand];
+          updateRaisedHandsWithPosition(updated);
+          return updated;
         });
       } else if (action === 'lower') {
-        setRaisedHands((prev) => prev.filter((hand) => hand.userId !== userId));
+        setRaisedHands((prev) => {
+          const updated = prev.filter((hand) => hand.userId !== userId);
+          updateRaisedHandsWithPosition(updated);
+          return updated;
+        });
       }
     };
 
+    eventListenerRef.current = handleCustomEvent;
     call.on('custom_event' as any, handleCustomEvent);
 
     return () => {
-      call.off('custom_event' as any, handleCustomEvent);
+      if (eventListenerRef.current) {
+        call.off('custom_event' as any, eventListenerRef.current);
+      }
     };
-  }, [call]);
+  }, [call, updateRaisedHandsWithPosition]);
 
   return (
     <RaiseHandContext.Provider

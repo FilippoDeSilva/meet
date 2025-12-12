@@ -4,8 +4,6 @@ import {
   CallParticipantsList,
   CallStatsButton,
   CallingState,
-  PaginatedGridLayout,
-  SpeakerLayout,
   useCallStateHooks,
   useCall,
 } from '@stream-io/video-react-sdk';
@@ -25,6 +23,8 @@ import RaiseHandButton from './RaiseHandButton';
 import CallControlsWrapper from './CallControlsWrapper';
 import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import CustomSpeakerLayout from './CustomSpeakerLayout';
+import CustomGridLayout from './CustomGridLayout';
 
 type CallLayoutType = 'grid' | 'speaker-left' | 'speaker-right';
 
@@ -107,11 +107,11 @@ const MeetingRoom = () => {
   const CallLayout = () => {
     switch (layout) {
       case 'grid':
-        return <PaginatedGridLayout />;
+        return <CustomGridLayout />;
       case 'speaker-right':
-        return <SpeakerLayout participantsBarPosition="left" />;
+        return <CustomSpeakerLayout participantsBarPosition="left" />;
       default:
-        return <SpeakerLayout participantsBarPosition="right" />;
+        return <CustomSpeakerLayout participantsBarPosition="right" />;
     }
   };
 
