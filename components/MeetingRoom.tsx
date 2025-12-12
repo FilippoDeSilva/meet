@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   CallParticipantsList,
   CallStatsButton,
@@ -37,10 +37,22 @@ const MeetingRoom = () => {
   const [showParticipants, setShowParticipants] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { useCallCallingState } = useCallStateHooks();
+  const { useCallCallingState, useCallEndedAt } = useCallStateHooks();
   const call = useCall();
+  const callEndedAt = useCallEndedAt();
 
   const callingState = useCallCallingState();
+
+  // Hard refresh when call ends to trigger state update
+  useEffect(() => {
+    if (callEndedAt) {
+      // Use a small delay to ensure the state is properly updated before refresh
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [callEndedAt]);
 
   const meetingId = Array.isArray(params.id) ? params.id[0] : params.id;
   const meetingUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/meeting/${meetingId}`;
