@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase-server';
-import { recordingService } from '@/lib/recording';
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,9 +50,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { meeting_id, recording_url, title, description } = body;
+    const { meetingId, recordingUrl, title, description } = body;
 
-    if (!meeting_id || !recording_url) {
+    if (!meetingId || !recordingUrl) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -63,9 +62,9 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabaseServer
       .from('meeting_recordings')
       .insert({
-        meeting_id,
+        meeting_id: meetingId,
         user_id: user.id,
-        recording_url,
+        recording_url: recordingUrl,
         title,
         description,
       })

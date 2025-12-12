@@ -1,7 +1,6 @@
 'use client';
 import { useState } from 'react';
 import {
-  CallControls,
   CallParticipantsList,
   CallStatsButton,
   CallingState,
@@ -23,11 +22,9 @@ import {
 import Loader from './Loader';
 import EndCallButton from './EndCallButton';
 import RaiseHandButton from './RaiseHandButton';
-import ShareableMeetingLink from './ShareableMeetingLink';
 import CallControlsWrapper from './CallControlsWrapper';
 import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { cn } from '@/lib/utils';
 
 type CallLayoutType = 'grid' | 'speaker-left' | 'speaker-right';
 
@@ -39,7 +36,6 @@ const MeetingRoom = () => {
   const [layout, setLayout] = useState<CallLayoutType>('speaker-left');
   const [showParticipants, setShowParticipants] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showShareLink, setShowShareLink] = useState(true);
   const [copied, setCopied] = useState(false);
   const { useCallCallingState } = useCallStateHooks();
   const call = useCall();
