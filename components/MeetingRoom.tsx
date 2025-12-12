@@ -37,8 +37,9 @@ const MeetingRoom = () => {
   const [showParticipants, setShowParticipants] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { useCallCallingState } = useCallStateHooks();
+  const { useCallCallingState, useCallEndedAt } = useCallStateHooks();
   const call = useCall();
+  const callEndedAt = useCallEndedAt();
 
   const callingState = useCallCallingState();
 

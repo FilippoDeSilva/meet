@@ -6,6 +6,8 @@ import {
   useCall,
   useCallStateHooks,
 } from '@stream-io/video-react-sdk';
+import { useRouter } from 'next/navigation';
+import { Home } from 'lucide-react';
 
 import Alert from './Alert';
 import { Button } from './ui/button';
