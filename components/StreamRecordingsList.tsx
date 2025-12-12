@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useStreamRecordings } from '@/hooks/useStreamRecordings';
 import Loader from './Loader';
-import { Play, Copy, Check, Download, Trash2, RefreshCw, Film, Clock, Share2 } from 'lucide-react';
+import { Play, Copy, Check, Download, Trash2, RefreshCw, Film, Clock } from 'lucide-react';
 import { useToast } from './ui/use-toast';
 
 const StreamRecordingsList = () => {
