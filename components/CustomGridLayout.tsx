@@ -8,7 +8,7 @@ const CustomGridLayout: React.FC = () => {
   const { raisedHands } = useRaiseHand();
   const { useParticipants } = useCallStateHooks();
   const participants = useParticipants();
-  const updateTimeoutRef = useRef<NodeJS.Timeout>();
+  const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>();
 
   useEffect(() => {
     const updateRaisedHandBadges = () => {
@@ -27,11 +27,14 @@ const CustomGridLayout: React.FC = () => {
         for (const container of videoContainers) {
           const htmlContainer = container as HTMLElement;
           const nameElement = htmlContainer.querySelector('[data-testid*="participant-name"]');
-          const nameText = nameElement?.textContent || htmlContainer.textContent || '';
+          const nameText = nameElement?.textContent?.trim() || '';
+          const fullText = htmlContainer.textContent?.trim() || '';
 
           if (
-            nameText.includes(participantName) ||
-            nameText.includes(participant.userId)
+            nameText === participantName ||
+            nameText === participant.userId ||
+            fullText.includes(participantName) ||
+            fullText.includes(participant.userId)
           ) {
             containerFound = htmlContainer;
             break;
@@ -43,11 +46,14 @@ const CustomGridLayout: React.FC = () => {
           for (const container of allContainers) {
             const htmlContainer = container as HTMLElement;
             const nameElement = htmlContainer.querySelector('[data-testid*="participant-name"]');
-            const nameText = nameElement?.textContent || htmlContainer.textContent || '';
+            const nameText = nameElement?.textContent?.trim() || '';
+            const fullText = htmlContainer.textContent?.trim() || '';
 
             if (
-              nameText.includes(participantName) ||
-              nameText.includes(participant.userId)
+              nameText === participantName ||
+              nameText === participant.userId ||
+              fullText.includes(participantName) ||
+              fullText.includes(participant.userId)
             ) {
               containerFound = htmlContainer;
               break;

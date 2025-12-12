@@ -72,52 +72,26 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const userId = getCurrentUserId();
     const userName = getCurrentUserName();
-    const timestamp = Date.now();
 
-    const newHand: RaisedHand = {
-      userId,
-      userName,
-      timestamp,
-      position: 0,
-    };
-
-    setRaisedHands((prev) => {
-      const updated = [...prev, newHand];
-      updateRaisedHandsWithPosition(updated);
-      return updated;
-    });
     setIsHandRaised(true);
-
     broadcastRaiseHand('raise', userId, userName);
-  }, [isHandRaised, getCurrentUserId, getCurrentUserName, broadcastRaiseHand, updateRaisedHandsWithPosition]);
+  }, [isHandRaised, getCurrentUserId, getCurrentUserName, broadcastRaiseHand]);
 
   const lowerHand = useCallback(() => {
     const userId = getCurrentUserId();
-    setRaisedHands((prev) => {
-      const updated = prev.filter((hand) => hand.userId !== userId);
-      updateRaisedHandsWithPosition(updated);
-      return updated;
-    });
     setIsHandRaised(false);
-
     broadcastRaiseHand('lower', userId, getCurrentUserName());
-  }, [getCurrentUserId, getCurrentUserName, broadcastRaiseHand, updateRaisedHandsWithPosition]);
+  }, [getCurrentUserId, getCurrentUserName, broadcastRaiseHand]);
 
   const lowerHandForUser = useCallback(
     (userId: string) => {
-      setRaisedHands((prev) => {
-        const updated = prev.filter((hand) => hand.userId !== userId);
-        updateRaisedHandsWithPosition(updated);
-        return updated;
-      });
-
       if (userId === getCurrentUserId()) {
         setIsHandRaised(false);
       }
 
       broadcastRaiseHand('lower', userId, '');
     },
-    [getCurrentUserId, broadcastRaiseHand, updateRaisedHandsWithPosition]
+    [getCurrentUserId, broadcastRaiseHand]
   );
 
   const currentUserPosition = raisedHands.find((hand) => hand.userId === getCurrentUserId())?.position ?? null;
