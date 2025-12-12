@@ -71,36 +71,14 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const raiseHand = useCallback(async () => {
     if (isHandRaised) return;
 
-    const userId = getCurrentUserId();
-    const userName = getCurrentUserName();
-    const timestamp = Date.now();
-
-    const newHand: RaisedHand = {
-      userId,
-      userName,
-      timestamp,
-      position: 0,
-    };
-
-    setRaisedHands((prev) => {
-      const updated = [...prev, newHand];
-      updateRaisedHandsWithPosition(updated);
-      return updated;
-    });
     setIsHandRaised(true);
     await broadcastRaiseHand('raise');
-  }, [isHandRaised, getCurrentUserId, getCurrentUserName, broadcastRaiseHand, updateRaisedHandsWithPosition]);
+  }, [isHandRaised, broadcastRaiseHand]);
 
   const lowerHand = useCallback(async () => {
-    const userId = getCurrentUserId();
-    setRaisedHands((prev) => {
-      const updated = prev.filter((hand) => hand.userId !== userId);
-      updateRaisedHandsWithPosition(updated);
-      return updated;
-    });
     setIsHandRaised(false);
     await broadcastRaiseHand('lower');
-  }, [getCurrentUserId, broadcastRaiseHand, updateRaisedHandsWithPosition]);
+  }, [broadcastRaiseHand]);
 
   const lowerHandForUser = useCallback(
     async (userId: string) => {
@@ -140,14 +118,22 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           };
 
           const updated = [...prev, newHand];
-          updateRaisedHandsWithPosition(updated);
-          return updated;
+          const sortedHands = updated.sort((a, b) => a.timestamp - b.timestamp);
+          const handsWithPosition = sortedHands.map((hand, index) => ({
+            ...hand,
+            position: index + 1,
+          }));
+          return handsWithPosition;
         });
       } else if (action === 'lower') {
         setRaisedHands((prev) => {
           const updated = prev.filter((hand) => hand.userId !== userId);
-          updateRaisedHandsWithPosition(updated);
-          return updated;
+          const sortedHands = updated.sort((a, b) => a.timestamp - b.timestamp);
+          const handsWithPosition = sortedHands.map((hand, index) => ({
+            ...hand,
+            position: index + 1,
+          }));
+          return handsWithPosition;
         });
       }
     };
@@ -160,7 +146,7 @@ export const RaiseHandProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         call.off('custom_event' as any, eventListenerRef.current);
       }
     };
-  }, [call, updateRaisedHandsWithPosition]);
+  }, [call]);
 
   return (
     <RaiseHandContext.Provider
