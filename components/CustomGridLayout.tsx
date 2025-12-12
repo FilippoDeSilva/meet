@@ -17,9 +17,12 @@ const CustomGridLayout: React.FC = () => {
 
       participants.forEach((participant) => {
         const participantName = participant.name || participant.userId;
-        const raisedHand = raisedHands.find(
-          (hand) => hand.userId === participant.userId || hand.userName === participantName
-        );
+        
+        // Check if participant has a raised-hand reaction
+        const hasRaisedHand = participant.reaction?.type === 'raised-hand';
+        const raisedHand = hasRaisedHand 
+          ? raisedHands.find((hand) => hand.userId === participant.userId)
+          : null;
 
         let containerFound: HTMLElement | null = null;
 
