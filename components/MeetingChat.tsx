@@ -61,7 +61,7 @@ const MeetingChat = ({ meetingId, onClose }: MeetingChatProps) => {
         const response = await fetch('/api/chat-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id }),
+          body: JSON.stringify({ userId: user.id, meetingId }),
         });
 
         console.log('[Chat] Step 6: Token response status:', response.status);
@@ -99,24 +99,13 @@ const MeetingChat = ({ meetingId, onClose }: MeetingChatProps) => {
 
         if (!isMounted) return;
 
-        // Create or get channel for this meeting
-        console.log('[Chat] Step 11: Creating/getting channel for meeting:', meetingId);
-        const channelInstance = clientInstance.channel('messaging', `meeting-${meetingId}`, {
-          members: [user.id],
-        });
+        // Get channel for this meeting (server already set it up)
+        console.log('[Chat] Step 11: Getting channel for meeting:', meetingId);
+        const channelInstance = clientInstance.channel('messaging', `meeting-${meetingId}`);
 
         console.log('[Chat] Step 12: Watching channel...');
         await channelInstance.watch();
-        console.log('[Chat] Step 13: Channel watched successfully');
-
-        // Add current user to channel members if not already a member
-        console.log('[Chat] Step 13.5: Adding user to channel members...');
-        try {
-          await channelInstance.addMembers([user.id]);
-          console.log('[Chat] Step 13.6: User added to channel members');
-        } catch (err) {
-          console.log('[Chat] Step 13.6: User already a member or error adding:', err);
-        }
+        console.log('[Chat] Step 12.5: Channel watched successfully');
         
         if (isMounted) {
           setChatClient(clientInstance);
