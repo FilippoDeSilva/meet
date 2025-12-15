@@ -95,6 +95,81 @@
     transform: none !important;
   }
 
+/* ======== Stream Chat CSS Overrides ======== */
+.str-chat {
+  background: #1f2937;
+  color: white;
+}
+
+.str-chat__channel-header {
+  background: #111827;
+  border-bottom: 1px solid #374151;
+  color: white;
+}
+
+.str-chat__message-input {
+  background: #111827;
+  border-top: 1px solid #374151;
+}
+
+.str-chat__message-input-inner {
+  background: #1f2937;
+  border: 1px solid #374151;
+}
+
+.str-chat__message-list {
+  background: #1f2937;
+}
+
+.str-chat__message {
+  color: white;
+}
+
+.str-chat__message-text {
+  background: #374151;
+  color: white;
+}
+
+.str-chat__message-team {
+  background: #2d3748;
+}
+
+.str-chat__thread-header {
+  background: #111827;
+  border-bottom: 1px solid #374151;
+  color: white;
+}
+
+.str-chat__input-flat {
+  background: #1f2937;
+  border: 1px solid #374151;
+  color: white;
+}
+
+.str-chat__input-flat input {
+  background: #1f2937;
+  color: white;
+}
+
+.str-chat__input-flat input::placeholder {
+  color: #9ca3af;
+}
+
+.str-chat__message-input-text-area {
+  background: #1f2937;
+  color: white;
+  border: 1px solid #374151;
+}
+
+.str-chat__message-input-text-area textarea {
+  background: #1f2937;
+  color: white;
+}
+
+.str-chat__message-input-text-area textarea::placeholder {
+  color: #9ca3af;
+}
+
 .glassmorphism {
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(4px);

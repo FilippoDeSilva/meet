@@ -8,7 +8,7 @@ import {
   useCall,
 } from '@stream-io/video-react-sdk';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
-import { Users, LayoutList, Maximize2, Minimize2, Settings, Copy, Check } from 'lucide-react';
+import { Users, LayoutList, Maximize2, Minimize2, Settings, Copy, Check, MessageCircle } from 'lucide-react';
 
 import {
   DropdownMenu,
@@ -25,6 +25,9 @@ import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import CustomSpeakerLayout from './CustomSpeakerLayout';
 import CustomGridLayout from './CustomGridLayout';
+import dynamic from 'next/dynamic';
+
+const MeetingChat = dynamic(() => import('./MeetingChat'), { ssr: false });
 
 type CallLayoutType = 'grid' | 'speaker-left' | 'speaker-right';
 
@@ -35,6 +38,7 @@ const MeetingRoom = () => {
   const router = useRouter();
   const [layout, setLayout] = useState<CallLayoutType>('speaker-left');
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
   const { useCallCallingState, useCallEndedAt } = useCallStateHooks();
@@ -158,6 +162,13 @@ const MeetingRoom = () => {
             <Settings size={20} />
           </button>
           <button
+            onClick={() => setShowChat(!showChat)}
+            className={`p-2 rounded-full transition-colors ${showChat ? 'bg-blue-600 hover:bg-blue-700' : 'hover:bg-gray-700'}`}
+            title="Chat"
+          >
+            <MessageCircle size={20} />
+          </button>
+          <button
             onClick={() => setShowParticipants(!showParticipants)}
             className="p-2 hover:bg-gray-700 rounded-full transition-colors"
             title="Participants"
@@ -173,6 +184,13 @@ const MeetingRoom = () => {
           <CallLayout />
         </div>
         
+        {/* Chat Sidebar */}
+        {showChat && (
+          <div className="w-80 bg-gray-800 border-l border-gray-700 overflow-hidden flex flex-col">
+            <MeetingChat meetingId={meetingId} onClose={() => setShowChat(false)} />
+          </div>
+        )}
+
         {/* Participants Sidebar */}
         {showParticipants && (
           <div className="w-80 bg-gray-800 border-l border-gray-700 overflow-y-auto">
