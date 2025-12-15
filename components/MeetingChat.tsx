@@ -115,33 +115,44 @@ const MeetingChat = ({ meetingId, onClose, onUnreadCountChange }: MeetingChatPro
           setIsLoading(false);
           console.log('[Chat] Step 14: Chat initialized successfully!');
 
-          // Get the current timestamp to track messages sent after chat opened
-          const chatOpenedAt = new Date();
+          // Count all existing unseen messages from other users
+          const messages = channelInstance.state?.messages || [];
+          const initialCountedIds = new Set<string>();
+          let initialUnreadCount = 0;
+
+          messages.forEach((msg: any) => {
+            const messageId = msg.id;
+            const messageSender = msg.user?.id;
+            
+            // Count messages from other users (not current user)
+            if (messageId && messageSender !== user.id && !initialCountedIds.has(messageId)) {
+              initialCountedIds.add(messageId);
+              initialUnreadCount++;
+            }
+          });
+
+          console.log('[Chat] Initial unseen messages count:', initialUnreadCount);
+          if (initialUnreadCount > 0) {
+            setCountedMessageIds(initialCountedIds);
+            onUnreadCountChange?.(initialUnreadCount);
+          }
 
           // Listen for new messages to update unread count
           const handleNewMessage = (event: any) => {
             const message = event.message;
             const messageId = message?.id;
             const messageSender = message?.user?.id;
-            const messageCreatedAt = message?.created_at ? new Date(message.created_at) : null;
 
             // Only count messages that:
             // 1. Haven't been counted yet
             // 2. Are NOT from the current user
-            // 3. Were created AFTER the chat was opened
-            if (
-              messageId &&
-              !countedMessageIds.has(messageId) &&
-              messageSender !== user.id &&
-              messageCreatedAt &&
-              messageCreatedAt >= chatOpenedAt
-            ) {
+            if (messageId && !initialCountedIds.has(messageId) && messageSender !== user.id) {
               setCountedMessageIds((prev) => {
                 const newSet = new Set(prev);
                 newSet.add(messageId);
                 const newCount = newSet.size;
                 onUnreadCountChange?.(newCount);
-                console.log('[Chat] New unread message from', messageSender, '- Count:', newCount);
+                console.log('[Chat] New unread message from', messageSender, '- Total Count:', newCount);
                 return newSet;
               });
             }
