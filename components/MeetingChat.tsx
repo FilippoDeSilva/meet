@@ -16,7 +16,7 @@ const MeetingChat = ({ meetingId, onClose, onUnreadCountChange }: MeetingChatPro
   const [channel, setChannel] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [components, setComponents] = useState<any>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [countedMessageIds, setCountedMessageIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let isMounted = true;
@@ -116,12 +116,17 @@ const MeetingChat = ({ meetingId, onClose, onUnreadCountChange }: MeetingChatPro
           console.log('[Chat] Step 14: Chat initialized successfully!');
 
           // Listen for new messages to update unread count
-          const handleNewMessage = () => {
-            setUnreadCount((prev) => {
-              const newCount = prev + 1;
-              onUnreadCountChange?.(newCount);
-              return newCount;
-            });
+          const handleNewMessage = (event: any) => {
+            const messageId = event.message?.id;
+            if (messageId && !countedMessageIds.has(messageId)) {
+              setCountedMessageIds((prev) => {
+                const newSet = new Set(prev);
+                newSet.add(messageId);
+                const newCount = newSet.size;
+                onUnreadCountChange?.(newCount);
+                return newSet;
+              });
+            }
           };
 
           channelInstance.on('message.new', handleNewMessage);
@@ -147,7 +152,7 @@ const MeetingChat = ({ meetingId, onClose, onUnreadCountChange }: MeetingChatPro
     return () => {
       isMounted = false;
     };
-  }, [user, meetingId]);
+  }, [user, meetingId, countedMessageIds, onUnreadCountChange]);
 
   if (isLoading || !chatClient || !components || !channel) {
     return (
