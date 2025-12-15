@@ -108,6 +108,15 @@ const MeetingChat = ({ meetingId, onClose }: MeetingChatProps) => {
         console.log('[Chat] Step 12: Watching channel...');
         await channelInstance.watch();
         console.log('[Chat] Step 13: Channel watched successfully');
+
+        // Add current user to channel members if not already a member
+        console.log('[Chat] Step 13.5: Adding user to channel members...');
+        try {
+          await channelInstance.addMembers([user.id]);
+          console.log('[Chat] Step 13.6: User added to channel members');
+        } catch (err) {
+          console.log('[Chat] Step 13.6: User already a member or error adding:', err);
+        }
         
         if (isMounted) {
           setChatClient(clientInstance);
