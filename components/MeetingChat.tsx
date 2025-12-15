@@ -8,15 +8,15 @@ interface MeetingChatProps {
   meetingId: string;
   onClose?: () => void;
   onUnreadCountChange?: (count: number) => void;
+  countedMessageIds?: Set<string>;
 }
 
-const MeetingChat = ({ meetingId, onClose, onUnreadCountChange }: MeetingChatProps) => {
+const MeetingChat = ({ meetingId, onClose, onUnreadCountChange, countedMessageIds: globalCountedIds }: MeetingChatProps) => {
   const { user } = useAuth();
   const [chatClient, setChatClient] = useState<any>(null);
   const [channel, setChannel] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [components, setComponents] = useState<any>(null);
-  const [countedMessageIds, setCountedMessageIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let isMounted = true;
@@ -115,54 +115,8 @@ const MeetingChat = ({ meetingId, onClose, onUnreadCountChange }: MeetingChatPro
           setIsLoading(false);
           console.log('[Chat] Step 14: Chat initialized successfully!');
 
-          // Count all existing unseen messages from other users
-          const messages = channelInstance.state?.messages || [];
-          const initialCountedIds = new Set<string>();
-          let initialUnreadCount = 0;
-
-          messages.forEach((msg: any) => {
-            const messageId = msg.id;
-            const messageSender = msg.user?.id;
-            
-            // Count messages from other users (not current user)
-            if (messageId && messageSender !== user.id && !initialCountedIds.has(messageId)) {
-              initialCountedIds.add(messageId);
-              initialUnreadCount++;
-            }
-          });
-
-          console.log('[Chat] Initial unseen messages count:', initialUnreadCount);
-          if (initialUnreadCount > 0) {
-            setCountedMessageIds(initialCountedIds);
-            onUnreadCountChange?.(initialUnreadCount);
-          }
-
-          // Listen for new messages to update unread count
-          const handleNewMessage = (event: any) => {
-            const message = event.message;
-            const messageId = message?.id;
-            const messageSender = message?.user?.id;
-
-            // Only count messages that:
-            // 1. Haven't been counted yet
-            // 2. Are NOT from the current user
-            if (messageId && !initialCountedIds.has(messageId) && messageSender !== user.id) {
-              setCountedMessageIds((prev) => {
-                const newSet = new Set(prev);
-                newSet.add(messageId);
-                const newCount = newSet.size;
-                onUnreadCountChange?.(newCount);
-                console.log('[Chat] New unread message from', messageSender, '- Total Count:', newCount);
-                return newSet;
-              });
-            }
-          };
-
-          channelInstance.on('message.new', handleNewMessage);
-
-          return () => {
-            channelInstance.off('message.new', handleNewMessage);
-          };
+          // Message tracking is now handled globally in MeetingRoom
+          console.log('[Chat] Chat UI initialized, message tracking handled by parent');
         }
       } catch (error) {
         console.error('[Chat] Error during initialization:', error);
@@ -181,7 +135,7 @@ const MeetingChat = ({ meetingId, onClose, onUnreadCountChange }: MeetingChatPro
     return () => {
       isMounted = false;
     };
-  }, [user, meetingId, countedMessageIds, onUnreadCountChange]);
+  }, [user, meetingId]);
 
   if (isLoading || !chatClient || !components || !channel) {
     return (

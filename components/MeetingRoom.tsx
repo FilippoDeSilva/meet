@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   CallParticipantsList,
   CallStatsButton,
@@ -9,6 +9,7 @@ import {
 } from '@stream-io/video-react-sdk';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { Users, LayoutList, Maximize2, Minimize2, Settings, Copy, Check, MessageCircle } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 import {
   DropdownMenu,
@@ -36,17 +37,21 @@ const MeetingRoom = () => {
   const params = useParams();
   const isPersonalRoom = !!searchParams.get('personal');
   const router = useRouter();
+  const { user } = useAuth();
   const [layout, setLayout] = useState<CallLayoutType>('speaker-left');
   const [showParticipants, setShowParticipants] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const countedMessageIdsRef = useRef<Set<string>>(new Set());
   const { useCallCallingState, useCallEndedAt } = useCallStateHooks();
   const call = useCall();
   const callEndedAt = useCallEndedAt();
 
   const callingState = useCallCallingState();
+  const meetingId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const meetingUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/meeting/${meetingId}`;
 
   // Hard refresh when call ends to trigger state update
   useEffect(() => {
@@ -59,8 +64,112 @@ const MeetingRoom = () => {
     }
   }, [callEndedAt]);
 
-  const meetingId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const meetingUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/meeting/${meetingId}`;
+  // Initialize Stream Chat client and listen for messages globally (even when chat is closed)
+  useEffect(() => {
+    let isMounted = true;
+    let clientInstance: any = null;
+    let channelInstance: any = null;
+
+    const initializeGlobalChatListener = async () => {
+      if (!user) {
+        console.log('[Global Chat] No user available');
+        return;
+      }
+
+      try {
+        console.log('[Global Chat] Initializing global message listener');
+        // @ts-ignore - Dynamic imports at runtime
+        const streamChat = await import('stream-chat');
+
+        // Get chat token from backend
+        const response = await fetch('/api/chat-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, meetingId }),
+        });
+
+        if (!response.ok) {
+          console.error('[Global Chat] Failed to get token');
+          return;
+        }
+
+        const { token, apiKey } = await response.json();
+
+        if (!isMounted) return;
+
+        // Initialize Stream Chat client
+        clientInstance = streamChat.StreamChat.getInstance(apiKey);
+
+        // Check if already connected
+        if (!clientInstance.userID) {
+          await clientInstance.connectUser(
+            {
+              id: user.id,
+              name: user.user_metadata?.full_name || user.email || 'Anonymous',
+              image: user.user_metadata?.avatar_url,
+            },
+            token
+          );
+          console.log('[Global Chat] User connected');
+        }
+
+        if (!isMounted) return;
+
+        // Get channel
+        channelInstance = clientInstance.channel('messaging', `meeting-${meetingId}`);
+        await channelInstance.watch();
+        console.log('[Global Chat] Channel watched');
+
+        // Count initial unseen messages
+        const messages = channelInstance.state?.messages || [];
+        messages.forEach((msg: any) => {
+          const messageId = msg.id;
+          const messageSender = msg.user?.id;
+
+          if (messageId && messageSender !== user.id && !countedMessageIdsRef.current.has(messageId)) {
+            countedMessageIdsRef.current.add(messageId);
+          }
+        });
+
+        const initialCount = countedMessageIdsRef.current.size;
+        if (initialCount > 0 && isMounted) {
+          setUnreadChatCount(initialCount);
+          console.log('[Global Chat] Initial unread count:', initialCount);
+        }
+
+        // Listen for new messages
+        const handleNewMessage = (event: any) => {
+          const message = event.message;
+          const messageId = message?.id;
+          const messageSender = message?.user?.id;
+
+          if (messageId && messageSender !== user.id && !countedMessageIdsRef.current.has(messageId)) {
+            countedMessageIdsRef.current.add(messageId);
+            if (isMounted) {
+              setUnreadChatCount(countedMessageIdsRef.current.size);
+              console.log('[Global Chat] New message - Total unread:', countedMessageIdsRef.current.size);
+            }
+          }
+        };
+
+        channelInstance.on('message.new', handleNewMessage);
+
+        return () => {
+          if (channelInstance) {
+            channelInstance.off('message.new', handleNewMessage);
+          }
+        };
+      } catch (error) {
+        console.error('[Global Chat] Error:', error);
+      }
+    };
+
+    initializeGlobalChatListener();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, meetingId]);
 
   const handleCopyLink = async () => {
     try {
@@ -201,7 +310,7 @@ const MeetingRoom = () => {
             <MeetingChat 
               meetingId={meetingId} 
               onClose={() => setShowChat(false)}
-              onUnreadCountChange={setUnreadChatCount}
+              countedMessageIds={countedMessageIdsRef.current}
             />
           </div>
         )}
