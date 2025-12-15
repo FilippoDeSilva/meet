@@ -1,18 +1,25 @@
-import { redirect } from 'next/navigation';
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import MeetingTypeList from '@/components/MeetingTypeList';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import Loader from '@/components/Loader';
+import { useAuth } from '@/hooks/useAuth';
 
-export default async function Home() {
-  const supabase = createServerComponentClient({ cookies });
-  
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+export default function Home() {
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
 
-  // Redirect to sign-in if not authenticated
-  if (!session) {
-    redirect('/sign-in');
+  useEffect(() => {
+    // Redirect to sign-in if not authenticated
+    if (!isLoading && !user) {
+      router.push('/sign-in');
+    }
+  }, [user, isLoading, router]);
+
+  // Show loader while checking auth or if user is not authenticated
+  if (isLoading || !user) {
+    return <Loader />;
   }
 
   const now = new Date();
