@@ -69,6 +69,7 @@ const MeetingRoom = () => {
     let isMounted = true;
     let clientInstance: any = null;
     let channelInstance: any = null;
+    let unsubscribe: (() => void) | null = null;
 
     const initializeGlobalChatListener = async () => {
       if (!user) {
@@ -132,29 +133,29 @@ const MeetingRoom = () => {
         });
 
         const initialCount = countedMessageIdsRef.current.size;
-        if (initialCount > 0 && isMounted) {
+        if (isMounted) {
           setUnreadChatCount(initialCount);
           console.log('[Global Chat] Initial unread count:', initialCount);
         }
 
         // Listen for new messages
         const handleNewMessage = (event: any) => {
+          if (!isMounted) return;
+          
           const message = event.message;
           const messageId = message?.id;
           const messageSender = message?.user?.id;
 
           if (messageId && messageSender !== user.id && !countedMessageIdsRef.current.has(messageId)) {
             countedMessageIdsRef.current.add(messageId);
-            if (isMounted) {
-              setUnreadChatCount(countedMessageIdsRef.current.size);
-              console.log('[Global Chat] New message - Total unread:', countedMessageIdsRef.current.size);
-            }
+            setUnreadChatCount(countedMessageIdsRef.current.size);
+            console.log('[Global Chat] New message - Total unread:', countedMessageIdsRef.current.size);
           }
         };
 
         channelInstance.on('message.new', handleNewMessage);
 
-        return () => {
+        unsubscribe = () => {
           if (channelInstance) {
             channelInstance.off('message.new', handleNewMessage);
           }
@@ -168,6 +169,9 @@ const MeetingRoom = () => {
 
     return () => {
       isMounted = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, [user, meetingId]);
 
