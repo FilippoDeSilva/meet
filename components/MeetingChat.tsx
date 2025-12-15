@@ -115,15 +115,33 @@ const MeetingChat = ({ meetingId, onClose, onUnreadCountChange }: MeetingChatPro
           setIsLoading(false);
           console.log('[Chat] Step 14: Chat initialized successfully!');
 
+          // Get the current timestamp to track messages sent after chat opened
+          const chatOpenedAt = new Date();
+
           // Listen for new messages to update unread count
           const handleNewMessage = (event: any) => {
-            const messageId = event.message?.id;
-            if (messageId && !countedMessageIds.has(messageId)) {
+            const message = event.message;
+            const messageId = message?.id;
+            const messageSender = message?.user?.id;
+            const messageCreatedAt = message?.created_at ? new Date(message.created_at) : null;
+
+            // Only count messages that:
+            // 1. Haven't been counted yet
+            // 2. Are NOT from the current user
+            // 3. Were created AFTER the chat was opened
+            if (
+              messageId &&
+              !countedMessageIds.has(messageId) &&
+              messageSender !== user.id &&
+              messageCreatedAt &&
+              messageCreatedAt >= chatOpenedAt
+            ) {
               setCountedMessageIds((prev) => {
                 const newSet = new Set(prev);
                 newSet.add(messageId);
                 const newCount = newSet.size;
                 onUnreadCountChange?.(newCount);
+                console.log('[Chat] New unread message from', messageSender, '- Count:', newCount);
                 return newSet;
               });
             }
