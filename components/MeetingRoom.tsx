@@ -41,6 +41,7 @@ const MeetingRoom = () => {
   const [showChat, setShowChat] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const { useCallCallingState, useCallEndedAt } = useCallStateHooks();
   const call = useCall();
   const callEndedAt = useCallEndedAt();
@@ -162,11 +163,21 @@ const MeetingRoom = () => {
             <Settings size={20} />
           </button>
           <button
-            onClick={() => setShowChat(!showChat)}
-            className={`p-2 rounded-full transition-colors ${showChat ? 'bg-blue-600 hover:bg-blue-700' : 'hover:bg-gray-700'}`}
+            onClick={() => {
+              setShowChat(!showChat);
+              if (!showChat) {
+                setUnreadChatCount(0);
+              }
+            }}
+            className={`relative p-2 rounded-full transition-colors ${showChat ? 'bg-blue-600 hover:bg-blue-700' : 'hover:bg-gray-700'}`}
             title="Chat"
           >
             <MessageCircle size={20} />
+            {unreadChatCount > 0 && !showChat && (
+              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
+                {unreadChatCount > 99 ? '99+' : unreadChatCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setShowParticipants(!showParticipants)}
@@ -186,8 +197,12 @@ const MeetingRoom = () => {
         
         {/* Chat Sidebar */}
         {showChat && (
-          <div className="w-80 bg-gray-800 border-l border-gray-700 overflow-hidden flex flex-col">
-            <MeetingChat meetingId={meetingId} onClose={() => setShowChat(false)} />
+          <div className="w-80 max-w-full sm:w-80 md:w-96 lg:w-96 bg-gray-800 border-l border-gray-700 overflow-hidden flex flex-col">
+            <MeetingChat 
+              meetingId={meetingId} 
+              onClose={() => setShowChat(false)}
+              onUnreadCountChange={setUnreadChatCount}
+            />
           </div>
         )}
 

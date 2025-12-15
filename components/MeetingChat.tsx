@@ -7,14 +7,16 @@ import { X } from 'lucide-react';
 interface MeetingChatProps {
   meetingId: string;
   onClose?: () => void;
+  onUnreadCountChange?: (count: number) => void;
 }
 
-const MeetingChat = ({ meetingId, onClose }: MeetingChatProps) => {
+const MeetingChat = ({ meetingId, onClose, onUnreadCountChange }: MeetingChatProps) => {
   const { user } = useAuth();
   const [chatClient, setChatClient] = useState<any>(null);
   const [channel, setChannel] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [components, setComponents] = useState<any>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -112,6 +114,21 @@ const MeetingChat = ({ meetingId, onClose }: MeetingChatProps) => {
           setChannel(channelInstance);
           setIsLoading(false);
           console.log('[Chat] Step 14: Chat initialized successfully!');
+
+          // Listen for new messages to update unread count
+          const handleNewMessage = () => {
+            setUnreadCount((prev) => {
+              const newCount = prev + 1;
+              onUnreadCountChange?.(newCount);
+              return newCount;
+            });
+          };
+
+          channelInstance.on('message.new', handleNewMessage);
+
+          return () => {
+            channelInstance.off('message.new', handleNewMessage);
+          };
         }
       } catch (error) {
         console.error('[Chat] Error during initialization:', error);
